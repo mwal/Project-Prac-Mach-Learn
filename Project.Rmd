@@ -1,0 +1,87 @@
+Project for determing the class of a given exercise 
+========================================================
+Outline - I am downloading the data for the training set and I am partitioning it into two parts of sizes 75% and 25%. The former will be my training set and the later will be my testing set within the larger framework of the training set I will test my model on the testing part and check the quality of the predictions and once satisfied, it will be applied to the **testing set provided** to us. 
+
+```{r}
+#Downloading data 
+fileUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+download.file(fileUrl, destfile="pml-training.csv", method="curl")
+FitbitTrain<-read.csv("pml-training.csv")
+```
+We are creating the test and train sets
+```{r}
+library(caret);library(psych)
+#important- here I am using stringsAsFactors=FALSE, so it will convert the classe variable into a character variable and not leave it as a factor variable as it is).
+#Here an indexing set it being created using classe which will be the object we 
+#want to predict later on. 
+trainIndex <- createDataPartition(FitbitTrain$classe,p=0.75,list=FALSE)
+traininginFitbitTrain<-FitbitTrain[trainIndex,]
+testinginFitbitTrain<- FitbitTrain[-trainIndex,]
+##dim(FitbitTrain); dim(trainIndex); were checked to be correct.
+###Now I am trying to reduce the variables that I need to fit the data
+##Step 1 is to determine the onces which enteries are characters,looking that data
+## shows that the enteries which are characters, seem to be derived from the data or is 
+##information like name, time, date, etc. 
+#This puts the list of all such columns together
+class <- c()
+for (i in 1:160){
+      if (class(FitbitTrain[,i])=="factor")
+      {class <- c(class,i)}
+}
+class
+##Now we remove variables with very small variance, for this we list those variables
+zerovar <- nearZeroVar(FitbitTrain)
+## Now we remove the enteries which are sparse. For this we use the describe the function 
+#which is available using the psych package.The second entry gives the number of row enteries. 
+#These numbers vary between 19622 and 4** 
+sparse <- which(describe(FitbitTrain)[,2]<19622) 
+invalid <- append(append(sparse,zerovar),class)
+invalid <- unique(sort(invalid))
+##Here is put together all the features that I would like to ignore.  
+invalid
+#invalid <- invalid[-length(invalid)]
+#trainIndex <- createDataPartition(FitbitTrain$classe,p=0.75,list=FALSE)
+traininginFitbitTrain1<-FitbitTrain[trainIndex,-invalid]
+#str(traininginFitbitTrain1)
+testinginFitbitTrain1<- FitbitTrain[-trainIndex,-invalid]
+#str(testinginFitbitTrain1)
+
+##dim(FitbitTrain); dim(trainIndex); were checked to be correct.
+invalid1 <- invalid[1:length(invalid)-1]
+invalid1
+##I want to ensure that I put back the classe feature into my data:
+
+traininginFitbitTrain2<-FitbitTrain[trainIndex,-invalid1]
+testinginFitbitTrain2<-FitbitTrain[-trainIndex,-invalid1]
+
+
+###Now I am doing the training and the train data
+
+
+preProc <- preProcess(traininginFitbitTrain1, method="pca")
+#str(traininginFitbitTrain1)
+valuesintraininginFitbitTrain1 <-  predict(preProc,traininginFitbitTrain1)
+#head(valuesintraininginFitbitTrain2)
+#head(traininginFitbitTrain2)
+
+modelintraininginFitbitTrain2 <- train(traininginFitbitTrain2$classe ~., data=valuesintraininginFitbitTrain1, method="rf", trControl = trainControl(method = "cv", number = 4, allowParallel = TRUE,verboseIter = TRUE))
+#modelintraininginFitbitTrain2
+
+#str(valuesintraininginFitbitTrain1)
+valuesintestinginFitbitTrain1 <-predict(preProc,testinginFitbitTrain1)
+
+confusionMatrix(testinginFitbitTrain2$classe, predict(modelintraininginFitbitTrain2,valuesintestinginFitbitTrain1))
+
+#################Now predicting the outcome of the 20 cases given in the assignment
+
+fileUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+download.file(fileUrl, destfile="pml-testing.csv", method="curl")
+FitbitTest<-read.csv("pml-testing.csv")
+FitbitTest1<-FitbitTest[,-invalid]
+valuesinFitbitTest1 <-predict(preProc,FitbitTest1)
+
+answers <- predict(modelintraininginFitbitTrain2,valuesinFitbitTest1)
+#predict(modelintraininginFitbitTrain2,valuesintestinginFitbitTrain1)
+answers
+
+```
